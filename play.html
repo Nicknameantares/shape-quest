@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shape Quest · Trainer</title>
+<meta name="description" content="10 new logic puzzles every day: which figure goes in place of the question mark?">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Nunito:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="css/play.css">
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="js/i18n.js"></script>
+<script src="js/puzzles.js"></script>
+<script>
+/* ---------- storage ---------- */
+const LS='shape-quest.v1';
+function load(){try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.players&&s.players.length)return s}catch(e){}
+  return{players:[{id:'p1',name:T('player',1),c:1}],cur:'p1',results:{}}}
+let store=load();
+function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
+function mergeStore(o){
+  if(!o||!Array.isArray(o.players))return;
+  o.players.forEach(p=>{if(p&&p.id&&!store.players.some(x=>x.id===p.id))store.players.push({id:String(p.id),name:String(p.name||'?').slice(0,20),c:+p.c||0,m:MODES[p.m]?p.m:undefined})});
+  Object.entries(o.results||{}).forEach(([pid,days])=>{
+    if(!store.players.some(x=>x.id===pid)||!days||typeof days!=='object')return;
+    const mine=store.results[pid]=store.results[pid]||{};
+    const cnt=a=>(a||[]).filter(Boolean).length;
+    Object.entries(days).forEach(([k,arr])=>{
+      if(Array.isArray(arr)&&cnt(arr)>cnt(mine[k]))mine[k]=arr.slice(0,10).map(x=>x&&typeof x==='object'?{c:+x.c,ok:!!x.ok,h:!!x.h}:null)});
+  });
+}
+// Transfer codes are compatible with the original Claude artifact version ("NF1:").
+const encodeCode=()=>'NF1:'+btoa(unescape(encodeURIComponent(JSON.stringify({players:store.players,results:store.results}))));
+function decodeCode(t){t=(t||'').trim().replace(/\s+/g,'');if(!t.startsWith('NF1:'))throw 0;return JSON.parse(decodeURIComponent(escape(atob(t.slice(4)))))}
+
+const TODAY=dstr(new Date());
+const ui={mode:'day',idx:null,practiceSeed:null,practice:[],hint:{},panel:false,arm:null,xfer:false,xmsg:null};
+const player=()=>store.players.find(p=>p.id===store.cur)||store.players[0];
+const pmode=pid=>{const p=store.players.find(x=>x.id===pid);return(p&&p.m)||'mid'};
+function dayRes(pid,d=TODAY){return((store.results[pid]||{})[rk(d,pmode(pid))])||[]}
+function answers(){return ui.mode==='day'?dayRes(player().id):ui.practice}
+function curSet(){const m=pmode(player().id);return ui.mode==='day'?getSet(TODAY,m):getSet(ui.practiceSeed,m)}
+function firstOpen(){const a=answers();for(let i=0;i<10;i++)if(!a[i])return i;return 10}
+function streak(pid){
+  const r=store.results[pid]||{};const done=d=>MODE_KEYS.some(m=>(r[rk(d,m)]||[]).filter(Boolean).length===10);
+  const d=new Date();let n=0;if(!done(dstr(d)))d.setDate(d.getDate()-1);
+  while(done(dstr(d))){n++;d.setDate(d.getDate()-1)}return n;
+}
+const okCount=a=>a.filter(x=>x&&x.ok).length;
+const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const avatar=p=>`<span class="av" style="background:var(--c${p.c%4})">${esc((p.name.trim()[0]||'?').toUpperCase())}</span>`;
+
+/* ---------- render ---------- */
+const app=document.getElementById('app');
+function render(){
+  document.title='Shape Quest · '+(LANG==='ru'?'Тренажёр':'Trainer');
+  if(ui.idx===null)ui.idx=firstOpen();
+  const a=answers(),set=curSet();
+  const dateTxt=new Date().toLocaleDateString(LOCALE(),{day:'numeric',month:'long',weekday:'long'});
+  let h=`<header>
+    <div class="top"><h1><a href="./" style="text-decoration:none;color:inherit">Shape <span>Quest</span></a></h1><div style="display:flex;gap:10px;align-items:center"><div class="date">${dateTxt}</div><button class="langbtn" data-act="lang">${T('lang')}</button></div></div>
+    <div class="players">${store.players.map(p=>`<button class="chip${p.id===store.cur?' on':''}" data-act="pl" data-id="${esc(p.id)}">${avatar(p)}${esc(p.name)} <span class="sc">${okCount(dayRes(p.id))}/10</span></button>`).join('')}
+    <button class="ghost" data-act="panel">${ui.panel?T('done'):T('players')}</button></div>
+  </header>`;
+  h+=`<div class="acct"><span class="st">${T('acct.local')}</span><button class="link" data-act="xfer">${ui.xfer?T('hide'):T('xfer')}</button></div>`;
+  if(ui.xfer)h+=xferHTML();
+  if(ui.panel)h+=panelHTML();
+  h+=`<div class="tabs"><button class="tab${ui.mode==='day'?' on':''}" data-act="mode" data-m="day">${T('tab.day')}</button><button class="tab${ui.mode==='practice'?' on':''}" data-act="mode" data-m="practice">${T('tab.practice')}</button></div>`;
+  const pm=pmode(player().id);
+  h+=`<div class="diff"><span class="dl">${T('diffFor',esc(player().name))}</span><div class="seg">${MODE_KEYS.map(k=>`<button class="sg${k===pm?' on':''}" data-act="diff" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div></div>`;
+  h+=`<div class="dots">${set.map((_,i)=>{const x=a[i];return `<button class="dot${x?(x.ok?' ok':' no'):''}${i===ui.idx?' cur':''}" data-act="go" data-i="${i}" aria-label="${T('dotAria',i+1)}">${i+1}</button>`}).join('')}</div>`;
+  h+=ui.idx>=10?summaryHTML(a):puzzleHTML(set[ui.idx],a[ui.idx]);
+  app.innerHTML=h;
+}
+function puzzleHTML(p,res){
+  const done=!!res,L=LABELS();
+  const boardW=p.n===2?240:360;
+  let h=`<div class="meta"><b>${T('task',ui.idx+1)}</b><div class="lvl">${levelName(p.level)}<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span></div></div>`;
+  h+=`<div class="tray"><div class="board" style="max-width:${boardW}px;grid-template-columns:repeat(${p.n},1fr)">${p.cells.map((c,i)=>
+    i===p.miss?(done&&res.ok?`<div class="cell q solved">${figSVG(c)}</div>`:`<div class="cell q">?</div>`):`<div class="cell">${figSVG(c)}</div>`).join('')}</div></div>`;
+  h+=`<p class="ask">${T('ask')}</p>`;
+  h+=`<div class="opts">${p.options.map((o,i)=>{
+    let cls='';if(done){if(i===p.ans)cls=' good';else if(i===res.c)cls=' bad';else cls=' dim'}
+    return `<button class="opt${cls}" data-act="ans" data-i="${i}" ${done?'disabled':''} aria-label="${T('optAria',L[i])}"><span class="lb">${L[i]}</span>${figSVG(o)}</button>`}).join('')}</div>`;
+  const why=`<ul>${explain(p.specs).map(w=>`<li>${w}</li>`).join('')}</ul>`;
+  if(done){
+    const praise=T('praise')[p.level%4];
+    h+=res.ok?`<div class="fb good"><strong>${praise}</strong>${why}</div>`
+             :`<div class="fb bad"><strong>${T('wrong',L[p.ans])}</strong>${why}</div>`;
+    h+=`<div class="actions"><button class="btn" data-act="next">${firstOpen()>=10?T('results'):T('next')} →</button></div>`;
+  }else if(ui.hint[ui.mode+ui.idx]){
+    h+=`<div class="fb"><strong>${T('hint')}</strong>${why}</div>`;
+  }else{
+    h+=`<div class="actions"><button class="btn sec" data-act="hint">${T('hint')}</button></div>`;
+  }
+  return h;
+}
+function summaryHTML(a){
+  const s=okCount(a);
+  const msg=T(s===10?'sum.10':s>=8?'sum.8':s>=5?'sum.5':'sum.0');
+  let h=`<div class="sum"><div class="big">${s}<small> / 10</small></div><div>${msg}</div>`;
+  if(ui.mode==='day'){
+    h+=`<table><thead><tr><th>${T('th.today')}</th><th>${T('th.level')}</th><th class="n">${T('th.right')}</th><th class="n">${T('th.streak')}</th></tr></thead><tbody>${
+      store.players.map(p=>{const r=dayRes(p.id),n=r.filter(Boolean).length,st=streak(p.id);
+        return `<tr><td><span class="who">${avatar(p)}${esc(p.name)}</span></td><td>${T('mode.'+pmode(p.id))}</td><td class="n">${n?T('ofN',okCount(r),n):'—'}</td><td class="n">${st} ${plural(st,T('days'))}</td></tr>`}).join('')}</tbody></table>
+      <p class="note">${T('sum.note')}</p>`;
+  }
+  h+=`<div class="actions"><button class="btn" data-act="newpractice">${T('more')}</button>${ui.mode==='day'?'':`<button class="btn sec" data-act="mode" data-m="day">${T('backDay')}</button>`}</div></div>`;
+  return h;
+}
+function panelHTML(){
+  return `<div class="panel"><h2>${T('players')}</h2>${store.players.map(p=>`<div class="prow">${avatar(p)}<input data-id="${esc(p.id)}" value="${esc(p.name)}" maxlength="20" aria-label="${T('nameAria')}">${store.players.length>1?`<button class="del${ui.arm===p.id?' arm':''}" data-act="del" data-id="${esc(p.id)}">${ui.arm===p.id?T('delSure'):T('del')}</button>`:''}</div>`).join('')}
+  <div class="actions"><button class="btn sec" data-act="add">${T('add')}</button></div>
+  <p class="note">${T('players.note')}</p></div>`;
+}
+function xferHTML(){
+  const m=ui.xmsg;
+  return `<div class="panel"><h2>${T('x.title')}</h2><p class="note">${T('x.note')}</p>
+  <h3>${T('x.out')}</h3><textarea id="xout" readonly>${encodeCode()}</textarea>
+  <div class="actions"><button class="btn sec" data-act="xcopy">${T('x.copy')}</button></div>
+  <h3>${T('x.in')}</h3><textarea id="xin" placeholder="NF1:…"></textarea>
+  <div class="actions"><button class="btn" data-act="ximport">${T('x.load')}</button></div>
+  ${m?`<p class="msg ${m[0]}">${T(m[1])}</p>`:''}</div>`;
+}
+
+/* ---------- events ---------- */
+app.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const act=b.dataset.act;
+  if(act!=='del')ui.arm=null;
+  if(act!=='xcopy'&&act!=='ximport')ui.xmsg=null;
+  if(act==='lang')setLang(LANG==='ru'?'en':'ru');
+  else if(act==='xfer')ui.xfer=!ui.xfer;
+  else if(act==='xcopy'){const t=document.getElementById('xout');t.select();
+    const msg=k=>{ui.xmsg=k;render()};
+    const fallback=()=>{try{msg(document.execCommand('copy')?['good','x.copied']:['bad','x.copyFail'])}catch(_){msg(['bad','x.copyFail'])}};
+    if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(()=>msg(['good','x.copied']),fallback);else fallback();
+    return}
+  else if(act==='ximport'){let o;try{o=decodeCode(document.getElementById('xin').value)}catch(_){ui.xmsg=['bad','x.bad'];render();return}
+    mergeStore(o);save();ui.idx=null;ui.xmsg=['good','x.ok']}
+  else if(act==='pl'){store.cur=b.dataset.id;save();ui.idx=null;if(ui.mode==='practice')ui.mode='day'}
+  else if(act==='panel')ui.panel=!ui.panel;
+  else if(act==='diff'){const p=player();if(p.m!==b.dataset.k){p.m=b.dataset.k;save();ui.idx=null;if(ui.mode==='practice')startPractice()}}
+  else if(act==='mode'){const m=b.dataset.m;if(m==='practice'&&!ui.practiceSeed)startPractice();ui.mode=m;ui.idx=null}
+  else if(act==='go')ui.idx=+b.dataset.i;
+  else if(act==='hint')ui.hint[ui.mode+ui.idx]=true;
+  else if(act==='ans'){
+    const a=answers();if(a[ui.idx])return;
+    const p=curSet()[ui.idx],i=+b.dataset.i;
+    const rec={c:i,ok:i===p.ans,h:!!ui.hint[ui.mode+ui.idx]};
+    if(ui.mode==='day'){const pid=player().id;store.results[pid]=store.results[pid]||{};const r=store.results[pid][rk(TODAY,pmode(pid))]=dayRes(pid).slice();r[ui.idx]=rec;save()}
+    else ui.practice[ui.idx]=rec;
+  }
+  else if(act==='next'){const a=answers();let n=10;for(let k=1;k<=10;k++){const j=(ui.idx+k)%10;if(!a[j]){n=j;break}}ui.idx=n}
+  else if(act==='newpractice'){startPractice();ui.mode='practice';ui.idx=0}
+  else if(act==='add'){const id='p'+Date.now();store.players.push({id,name:T('player',store.players.length+1),c:store.players.length%4});save()}
+  else if(act==='del'){const id=b.dataset.id;
+    if(ui.arm===id){store.players=store.players.filter(p=>p.id!==id);delete store.results[id];if(store.cur===id)store.cur=store.players[0].id;ui.arm=null;ui.idx=null;save()}
+    else ui.arm=id}
+  render();
+  if(act==='next'&&window.scrollTo)window.scrollTo({top:0,behavior:'smooth'});
+});
+app.addEventListener('input',e=>{const t=e.target;if(t.matches('.prow input')){const p=store.players.find(x=>x.id===t.dataset.id);if(p){p.name=t.value||'?';save()}}});
+app.addEventListener('change',e=>{if(e.target.matches('.prow input'))render()});
+function startPractice(){ui.practiceSeed='pr'+Date.now()+Math.random();ui.practice=[];ui.hint={}}
+render();
+</script>
+</body>
+</html>

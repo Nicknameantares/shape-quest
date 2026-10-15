@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shape Quest: a daily logic puzzle</title>
+<meta name="description" content="10 new logic puzzles every day for kids and adults: which figure goes in place of the question mark?">
+<meta property="og:title" content="Shape Quest">
+<meta property="og:description" content="10 new logic puzzles every day for kids and adults.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Nunito:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="logo"><i>?</i>Shape Quest</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="langbtn" id="lang"></button>
+      <a class="btn sm" href="play.html" data-t="l.open"></a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow" id="today-label"></div>
+      <h1 data-t="l.h1"></h1>
+      <p class="lead" data-t="l.lead"></p>
+      <div class="clock">
+        <small data-t="l.clock"></small>
+        <div class="digits" aria-live="off"><span id="hh">00</span><b>:</b><span id="mm">00</span><b>:</b><span id="ss">00</span></div>
+      </div>
+      <div class="cta">
+        <a class="btn" href="play.html" data-t="l.solve"></a>
+        <a class="btn sec" href="#set" data-t="l.see"></a>
+      </div>
+    </div>
+    <div class="play" id="play"></div>
+  </div>
+
+  <section id="set">
+    <div class="sh">
+      <div><h2 id="set-title"></h2><p class="sub" data-t="l.setSub"></p></div>
+      <div class="days" id="days"></div>
+    </div>
+    <div id="seg2" style="max-width:460px"></div>
+    <div class="set" id="grid"></div>
+  </section>
+
+  <section>
+    <div class="sh"><div><h2 data-t="l.ladderH"></h2><p class="sub" data-t="l.ladderSub"></p></div></div>
+    <div class="ladder">
+      <div class="rung"><span class="n" data-t="l.r1n"></span><h3 data-t="l.r1h"></h3><p data-t="l.r1p"></p><div class="bar"><i style="width:25%"></i></div></div>
+      <div class="rung"><span class="n" data-t="l.r2n"></span><h3 data-t="l.r2h"></h3><p data-t="l.r2p"></p><div class="bar"><i style="width:50%"></i></div></div>
+      <div class="rung"><span class="n" data-t="l.r3n"></span><h3 data-t="l.r3h"></h3><p data-t="l.r3p"></p><div class="bar"><i style="width:75%"></i></div></div>
+      <div class="rung"><span class="n" data-t="l.r4n"></span><h3 data-t="l.r4h"></h3><p data-t="l.r4p"></p><div class="bar"><i style="width:100%"></i></div></div>
+    </div>
+  </section>
+
+  <div class="family">
+    <div>
+      <h2 data-t="l.famH"></h2>
+      <p data-t="l.famP"></p>
+      <p data-t="l.famP2"></p>
+      <a class="btn" href="play.html" data-t="l.famBtn"></a>
+    </div>
+    <ol class="steps">
+      <li><span data-t="l.s1"></span></li>
+      <li><span data-t="l.s2"></span></li>
+      <li><span data-t="l.s3"></span></li>
+      <li><span data-t="l.s4"></span></li>
+      <li><span data-t="l.s5"></span></li>
+    </ol>
+  </div>
+
+  <footer data-t="l.foot"></footer>
+</div>
+
+<script src="js/i18n.js"></script>
+<script src="js/puzzles.js"></script>
+<script>
+let TODAY=dstr(new Date()),sel=TODAY,heroPick=null,mode='mid';
+try{mode=localStorage.getItem('sq-land-mode')||'mid';if(!MODES[mode])mode='mid'}catch(e){}
+
+function boardHTML(p,solved){
+  return `<div class="board" style="grid-template-columns:repeat(${p.n},1fr)">${p.cells.map((c,i)=>
+    i===p.miss?(solved?`<div class="cell q solved">${figSVG(c)}</div>`:`<div class="cell q">?</div>`):`<div class="cell">${figSVG(c)}</div>`).join('')}</div>`;
+}
+function segHTML(){return `<div class="seg" role="group">${MODE_KEYS.map(k=>`<button class="sg${k===mode?' on':''}" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div>`}
+function renderHero(){
+  const p=getSet(TODAY,mode)[2],done=heroPick!==null,ok=done&&heroPick===p.ans,L=LABELS();
+  document.getElementById('play').innerHTML=`
+   <div class="play-h"><b>${T('l.try')}</b><span class="tag">${T('l.tag',levelName(p.level))}</span></div>
+   ${segHTML()}
+   <div class="tray"><div style="width:100%;max-width:300px">${boardHTML(p,ok)}</div></div>
+   <div class="opts">${p.options.map((o,i)=>{let c='';if(done){c=i===p.ans?' good':i===heroPick?' bad':' dim'}
+     return `<button class="opt${c}" data-i="${i}" ${done?'disabled':''} aria-label="${L[i]}"><span class="lb">${L[i]}</span>${figSVG(o)}</button>`}).join('')}</div>
+   <div class="fb ${done?(ok?'good':'bad'):''}">${done?(ok?T('l.ok'):T('l.bad',L[p.ans],explain(p.specs).join(' '))):T('l.pick')}</div>`;
+}
+function renderDays(){
+  const out=[];const d=new Date();
+  for(let k=0;k<7;k++){const x=new Date(d);x.setDate(d.getDate()-k);const s=dstr(x);
+    const wd=k===0?T('l.today'):x.toLocaleDateString(LOCALE(),{weekday:'short'});
+    out.push(`<button class="day${s===sel?' on':''}" data-d="${s}"><small>${wd}</small><b>${x.getDate()}</b></button>`)}
+  document.getElementById('days').innerHTML=out.join('');
+}
+function renderGrid(){
+  const set=getSet(sel,mode),isToday=sel===TODAY;
+  const dt=new Date(sel+'T12:00:00').toLocaleDateString(LOCALE(),{day:'numeric',month:'long'});
+  document.getElementById('set-title').textContent=T(isToday?'l.setToday':'l.setPast',dt)+' · '+T('mode.'+mode).toLowerCase();
+  document.getElementById('grid').innerHTML=set.map((p,ix)=>`<a class="mini" href="play.html" aria-label="${T('dotAria',ix+1)}">
+      ${boardHTML(p,!isToday)}
+      <div class="mini-f"><span>№${ix+1}</span>${ix===9?`<span class="badge">${T('l.final')}</span>`:`<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span>`}</div></a>`).join('');
+}
+function renderStatic(){
+  document.title=T('l.title');
+  document.querySelectorAll('[data-t]').forEach(el=>{el.innerHTML=T(el.dataset.t)});
+  document.getElementById('lang').textContent=T('lang');
+  document.getElementById('today-label').textContent=T('l.todayFor',new Date().toLocaleDateString(LOCALE(),{day:'numeric',month:'long',weekday:'long'}));
+}
+function init(){renderStatic();renderHero();renderDays();renderGrid();document.getElementById('seg2').innerHTML=segHTML()}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.sg');if(!b)return;
+  mode=b.dataset.k;try{localStorage.setItem('sq-land-mode',mode)}catch(_){}
+  heroPick=null;renderHero();renderGrid();document.getElementById('seg2').innerHTML=segHTML();
+});
+document.getElementById('play').addEventListener('click',e=>{const b=e.target.closest('.opt');if(!b||heroPick!==null)return;heroPick=+b.dataset.i;renderHero()});
+document.getElementById('days').addEventListener('click',e=>{const b=e.target.closest('.day');if(!b)return;sel=b.dataset.d;renderDays();renderGrid()});
+document.getElementById('lang').addEventListener('click',()=>{setLang(LANG==='ru'?'en':'ru');init()});
+
+function tick(){
+  const now=new Date();
+  if(dstr(now)!==TODAY){TODAY=dstr(now);sel=TODAY;heroPick=null;init()}
+  const mid=new Date(now);mid.setHours(24,0,0,0);
+  const s=Math.max(0,Math.floor((mid-now)/1000)),p=v=>String(v).padStart(2,'0');
+  document.getElementById('hh').textContent=p(Math.floor(s/3600));
+  document.getElementById('mm').textContent=p(Math.floor(s%3600/60));
+  document.getElementById('ss').textContent=p(s%60);
+}
+init();tick();setInterval(tick,1000);
+</script>
+</body>
+</html>

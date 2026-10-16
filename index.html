@@ -83,20 +83,17 @@
 let TODAY=dstr(new Date()),sel=TODAY,heroPick=null,mode='mid';
 try{mode=localStorage.getItem('sq-land-mode')||'mid';if(!MODES[mode])mode='mid'}catch(e){}
 
-function boardHTML(p,solved){
-  return `<div class="board" style="grid-template-columns:repeat(${p.n},1fr)">${p.cells.map((c,i)=>
-    i===p.miss?(solved?`<div class="cell q solved">${figSVG(c)}</div>`:`<div class="cell q">?</div>`):`<div class="cell">${figSVG(c)}</div>`).join('')}</div>`;
-}
 function segHTML(){return `<div class="seg" role="group">${MODE_KEYS.map(k=>`<button class="sg${k===mode?' on':''}" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div>`}
 function renderHero(){
   const p=getSet(TODAY,mode)[2],done=heroPick!==null,ok=done&&heroPick===p.ans,L=LABELS();
   document.getElementById('play').innerHTML=`
    <div class="play-h"><b>${T('l.try')}</b><span class="tag">${T('l.tag',levelName(p.level))}</span></div>
    ${segHTML()}
-   <div class="tray"><div style="width:100%;max-width:300px">${boardHTML(p,ok)}</div></div>
-   <div class="opts">${p.options.map((o,i)=>{let c='';if(done){c=i===p.ans?' good':i===heroPick?' bad':' dim'}
-     return `<button class="opt${c}" data-i="${i}" ${done?'disabled':''} aria-label="${L[i]}"><span class="lb">${L[i]}</span>${figSVG(o)}</button>`}).join('')}</div>
-   <div class="fb ${done?(ok?'good':'bad'):''}">${done?(ok?T('l.ok'):T('l.bad',L[p.ans],explain(p.specs).join(' '))):T('l.pick')}</div>`;
+   ${p.type==='odd'?'':`<div class="tray"><div style="width:100%;max-width:${p.type==='matrix'?300:520}px">${boardHTML(p,ok)}</div></div>`}
+   <p class="ask">${T(p.type==='matrix'?'ask':'ask.'+p.type)}</p>
+   <div class="opts${p.type==='odd'?' five':''}">${p.options.map((o,i)=>{let c='';if(done){c=i===p.ans?' good':i===heroPick?' bad':' dim'}
+     return `<button class="opt${c}" data-i="${i}" ${done?'disabled':''} aria-label="${L[i]}"><span class="lb">${L[i]}</span>${drawFig(o)}</button>`}).join('')}</div>
+   <div class="fb ${done?(ok?'good':'bad'):''}">${done?(ok?T('l.ok'):T('l.bad',L[p.ans],explainP(p).join(' '))):T('l.pick')}</div>`;
 }
 function renderDays(){
   const out=[];const d=new Date();
@@ -111,6 +108,7 @@ function renderGrid(){
   document.getElementById('set-title').textContent=T(isToday?'l.setToday':'l.setPast',dt)+' · '+T('mode.'+mode).toLowerCase();
   document.getElementById('grid').innerHTML=set.map((p,ix)=>`<a class="mini" href="play.html" aria-label="${T('dotAria',ix+1)}">
       ${boardHTML(p,!isToday)}
+      <div class="mini-t">${T('type.'+p.type[0])}</div>
       <div class="mini-f"><span>№${ix+1}</span>${ix===9?`<span class="badge">${T('l.final')}</span>`:`<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span>`}</div></a>`).join('');
 }
 function renderStatic(){

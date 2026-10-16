@@ -37,12 +37,12 @@ const encodeCode=()=>'NF1:'+btoa(unescape(encodeURIComponent(JSON.stringify({pla
 function decodeCode(t){t=(t||'').trim().replace(/\s+/g,'');if(!t.startsWith('NF1:'))throw 0;return JSON.parse(decodeURIComponent(escape(atob(t.slice(4)))))}
 
 const TODAY=dstr(new Date());
-const ui={mode:'day',idx:null,practiceSeed:null,practice:[],hint:{},panel:false,arm:null,xfer:false,xmsg:null};
+const ui={mode:'day',ptype:'mix',idx:null,practiceSeed:null,practice:[],hint:{},panel:false,arm:null,xfer:false,xmsg:null};
 const player=()=>store.players.find(p=>p.id===store.cur)||store.players[0];
 const pmode=pid=>{const p=store.players.find(x=>x.id===pid);return(p&&p.m)||'mid'};
 function dayRes(pid,d=TODAY){return((store.results[pid]||{})[rk(d,pmode(pid))])||[]}
 function answers(){return ui.mode==='day'?dayRes(player().id):ui.practice}
-function curSet(){const m=pmode(player().id);return ui.mode==='day'?getSet(TODAY,m):getSet(ui.practiceSeed,m)}
+function curSet(){const m=pmode(player().id);return ui.mode==='day'?getSet(TODAY,m):getSet(ui.practiceSeed,m,ui.ptype)}
 function firstOpen(){const a=answers();for(let i=0;i<10;i++)if(!a[i])return i;return 10}
 function streak(pid){
   const r=store.results[pid]||{};const done=d=>MODE_KEYS.some(m=>(r[rk(d,m)]||[]).filter(Boolean).length===10);
@@ -71,21 +71,21 @@ function render(){
   h+=`<div class="tabs"><button class="tab${ui.mode==='day'?' on':''}" data-act="mode" data-m="day">${T('tab.day')}</button><button class="tab${ui.mode==='practice'?' on':''}" data-act="mode" data-m="practice">${T('tab.practice')}</button></div>`;
   const pm=pmode(player().id);
   h+=`<div class="diff"><span class="dl">${T('diffFor',esc(player().name))}</span><div class="seg">${MODE_KEYS.map(k=>`<button class="sg${k===pm?' on':''}" data-act="diff" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div></div>`;
+  if(ui.mode==='practice')h+=`<div class="diff"><span class="dl">${T('ptype')}</span><div class="seg four">${TYPES.map(k=>`<button class="sg${k===ui.ptype?' on':''}" data-act="ptype" data-k="${k}"><b>${T('type.'+k)}</b></button>`).join('')}</div></div>`;
   h+=`<div class="dots">${set.map((_,i)=>{const x=a[i];return `<button class="dot${x?(x.ok?' ok':' no'):''}${i===ui.idx?' cur':''}" data-act="go" data-i="${i}" aria-label="${T('dotAria',i+1)}">${i+1}</button>`}).join('')}</div>`;
   h+=ui.idx>=10?summaryHTML(a):puzzleHTML(set[ui.idx],a[ui.idx]);
   app.innerHTML=h;
 }
 function puzzleHTML(p,res){
   const done=!!res,L=LABELS();
-  const boardW=p.n===2?240:360;
-  let h=`<div class="meta"><b>${T('task',ui.idx+1)}</b><div class="lvl">${levelName(p.level)}<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span></div></div>`;
-  h+=`<div class="tray"><div class="board" style="max-width:${boardW}px;grid-template-columns:repeat(${p.n},1fr)">${p.cells.map((c,i)=>
-    i===p.miss?(done&&res.ok?`<div class="cell q solved">${figSVG(c)}</div>`:`<div class="cell q">?</div>`):`<div class="cell">${figSVG(c)}</div>`).join('')}</div></div>`;
-  h+=`<p class="ask">${T('ask')}</p>`;
-  h+=`<div class="opts">${p.options.map((o,i)=>{
+  const boardW=p.type==='matrix'?(p.n===2?240:360):p.type==='odd'?0:560;
+  let h=`<div class="meta"><b>${T('task',ui.idx+1)} · ${T('type.'+p.type[0])}</b><div class="lvl">${levelName(p.level)}<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span></div></div>`;
+  if(boardW)h+=`<div class="tray"><div style="width:100%;max-width:${boardW}px">${boardHTML(p,done&&res.ok)}</div></div>`;
+  h+=`<p class="ask">${T(p.type==='matrix'?'ask':'ask.'+p.type)}</p>`;
+  h+=`<div class="opts${p.type==='odd'?' five':''}">${p.options.map((o,i)=>{
     let cls='';if(done){if(i===p.ans)cls=' good';else if(i===res.c)cls=' bad';else cls=' dim'}
-    return `<button class="opt${cls}" data-act="ans" data-i="${i}" ${done?'disabled':''} aria-label="${T('optAria',L[i])}"><span class="lb">${L[i]}</span>${figSVG(o)}</button>`}).join('')}</div>`;
-  const why=`<ul>${explain(p.specs).map(w=>`<li>${w}</li>`).join('')}</ul>`;
+    return `<button class="opt${cls}" data-act="ans" data-i="${i}" ${done?'disabled':''} aria-label="${T('optAria',L[i])}"><span class="lb">${L[i]}</span>${drawFig(o)}</button>`}).join('')}</div>`;
+  const why=`<ul>${explainP(p).map(w=>`<li>${w}</li>`).join('')}</ul>`;
   if(done){
     const praise=T('praise')[p.level%4];
     h+=res.ok?`<div class="fb good"><strong>${praise}</strong>${why}</div>`
@@ -145,6 +145,7 @@ app.addEventListener('click',e=>{
   else if(act==='panel')ui.panel=!ui.panel;
   else if(act==='diff'){const p=player();if(p.m!==b.dataset.k){p.m=b.dataset.k;save();ui.idx=null;if(ui.mode==='practice')startPractice()}}
   else if(act==='mode'){const m=b.dataset.m;if(m==='practice'&&!ui.practiceSeed)startPractice();ui.mode=m;ui.idx=null}
+  else if(act==='ptype'){if(ui.ptype!==b.dataset.k){ui.ptype=b.dataset.k;startPractice();ui.idx=null}}
   else if(act==='go')ui.idx=+b.dataset.i;
   else if(act==='hint')ui.hint[ui.mode+ui.idx]=true;
   else if(act==='ans'){

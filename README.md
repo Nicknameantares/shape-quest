@@ -4,7 +4,7 @@ A daily logic trainer for kids and adults: find the missing figure, spot the odd
 
 - 10 new puzzles every day at midnight (local time), from easy to hard, mixing three kinds:
   - **Missing figure**: a 2×2 or 3×3 grid with a gap.
-  - **Odd one out**: five pictures, four share a rule (shape, color, opposite sectors, cell count, symmetry, turned vs. mirrored).
+  - **Odd one out**: five pictures, four share a rule (shape, color, opposite sectors, round inside straight, cell count, inner polygon with one side fewer, symmetry, half-black circles facing outward, turned vs. mirrored, numbers built from the side count).
   - **What comes next**: a row that repeats, fills, turns or moves, up to turns that grow and mirror-image traps.
 - Practice mode can drill one kind at a time.
 - Three difficulty levels: easy (for kids), normal (levels 1–10), hard (for adults).

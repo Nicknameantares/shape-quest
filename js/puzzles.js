@@ -128,6 +128,7 @@ const sortOn=a=>a.slice().sort((x,y)=>(Array.isArray(x)?x[1]-y[1]||x[0]-y[0]:x-y
 const sect=(on,n=8)=>({k:'sect',n,on:sortOn(on)});
 const grid=(on,n)=>({k:'grid',n,on:[...new Set(on)].sort((a,b)=>a-b)});
 const glyph=(g,rot,mir=false)=>({k:'glyph',g,rot:m8(rot),mir});
+const nest=(o,i,ir=0)=>({k:'nest',o,i,ir});
 
 /* grid transforms on cell indices of an n×n grid */
 const gT={
@@ -149,7 +150,25 @@ function buildOdd(level,r){
   let items,why;
   const place=(norm,odd)=>{const at=Math.floor(r()*5);norm.splice(at,0,odd);return{items:norm,ans:at}};
   let res;
-  if(level<=3){
+  // Levels 4, 5, 6 and 10 switch on half of the days to a variant modelled on math-test examples.
+  const alt=[4,5,6,10].includes(level)&&r()<.5;
+  if(alt&&level===4){
+    // A straight-sided frame around a round shape; the odd one is the other way round.
+    const os=sample(r,['p3','p4','p5','p6','p7','p8','trap','para'],4),is=sample(r,['circle','ellipse','heart','cloud','drop'],4);
+    res=place(os.map((o,i)=>nest(o,is[i])),nest(pick(r,['circle','shield']),pick(r,['p3','p4','p5','dia'])));why=[['why.odd.curve']];
+  }else if(alt&&level===5){
+    // The inner polygon has one side fewer than the outer one; the odd one has two fewer.
+    const ns=sample(r,[4,5,6,7,8],4),m=pick(r,[5,6,7,8]);
+    res=place(ns.map(n=>nest('p'+n,'p'+(n-1),Math.floor(r()*4))),nest('p'+m,'p'+(m-2),Math.floor(r()*4)));why=[['why.odd.nest']];
+  }else if(alt&&level===6){
+    // Two half-black circles whose black halves face outward; in the odd one both face the same way.
+    const combos=shuffle(r,['sq','ci','oct','dsh'].flatMap(f=>[0,1,2,3].map(a=>[f,a]))).slice(0,4);
+    res=place(combos.map(([f,a])=>({k:'halves',f,a,flip:false})),{k:'halves',f:pick(r,['sq','ci','oct','dsh']),a:Math.floor(r()*4),flip:true});why=[['why.odd.halves']];
+  }else if(alt&&level===10){
+    // The number is made of the neighbours of the side count (hexagon: 5 and 7). The odd number still differs by 2, so only counting sides finds it.
+    const ns=sample(r,[3,4,5,6,7,8],4),m=pick(r,[4,5,6,7,8]);
+    res=place(ns.map(n=>({k:'num',n,t:''+(n-1)+(n+1)})),{k:'num',n:m,t:''+(m-2)+m});why=[['why.odd.num']];
+  }else if(level<=3){
     // One feature is shared by four pictures; every other feature is all different, so it can't single anyone out.
     const R=level===1?'shape':level===2?'color':pick(r,['count','fill']);
     const D=level===1?['color']:level===2?['shape']:['shape','color'];
@@ -270,7 +289,34 @@ const GLYPH={
     return `<g style="stroke:var(--ink);stroke-width:3;stroke-linejoin:round"><polygon points="${pts([A,B,C])}" style="fill:var(--card)"/><polygon points="${pts([A,P(.42,A,B),P(.42,A,C)])}" style="fill:var(--ink)"/><polygon points="${pts([B,P(.42,B,A),P(.42,B,C)])}" style="fill:var(--c3)"/></g>`})()
 };
 function glyphSVG(c){return `<svg viewBox="0 0 100 100" aria-hidden="true"><g transform="rotate(${c.rot*45} 50 50)${c.mir?' matrix(-1 0 0 1 100 0)':''}">${GLYPH[c.g]}</g></svg>`}
-function drawFig(c){return c.k==='sect'?sectSVG(c):c.k==='grid'?gridSVG(c):c.k==='glyph'?glyphSVG(c):figSVG(c)}
+// Outlines for frames and inner shapes; R is the outer radius in the 100×100 box.
+const CURVE={heart:'M0 30C-30 10-34-16-16-22C-6-25 0-16 0-10C0-16 6-25 16-22C34-16 30 10 0 30Z',
+  cloud:'M-28 14C-40 14-40-4-28-4C-30-18-12-24-6-14C-2-28 22-28 22-12C36-14 40 6 28 10C30 20 14 24 8 16C2 24-16 24-18 14Z',
+  drop:'M0-32C10-10 22 4 22 14A22 22 0 0 1-22 14C-22 4-10-10 0-32Z',
+  shield:'M-34-30Q-17-20 0-34Q17-20 34-30L34 0Q34 26 0 38Q-34 26-34 0Z'};
+const polyPts=(n,R,rot=0)=>Array.from({length:n},(_,i)=>{const a=(-90+rot+360*i/n)*Math.PI/180;return (50+R*Math.cos(a)).toFixed(1)+','+(50+R*Math.sin(a)).toFixed(1)}).join(' ');
+function outline(s,R,rot=0,st=''){
+  const P=pts=>`<polygon points="${pts.map(([x,y])=>(50+x*R).toFixed(1)+','+(50+y*R).toFixed(1)).join(' ')}" style="${st}"/>`;
+  if(s[0]==='p')return `<polygon points="${polyPts(+s.slice(1),R,rot)}" style="${st}"/>`;
+  if(s==='dia')return P([[0,-1],[.65,0],[0,1],[-.65,0]]);
+  if(s==='trap')return P([[-.55,-.55],[.55,-.55],[1,.55],[-1,.55]]);
+  if(s==='para')return P([[-.5,-.5],[1,-.5],[.5,.5],[-1,.5]]);
+  if(s==='circle')return `<circle cx="50" cy="50" r="${(R*.9).toFixed(1)}" style="${st}"/>`;
+  if(s==='ellipse')return `<ellipse cx="50" cy="50" rx="${R}" ry="${(R*.55).toFixed(1)}" style="${st}"/>`;
+  return `<path d="${CURVE[s]}" transform="translate(50 50) scale(${(R/36).toFixed(3)})" style="${st};vector-effect:non-scaling-stroke"/>`;
+}
+const LINE='stroke:var(--ink);stroke-width:2.6;stroke-linejoin:round';
+function nestSVG(c){const inR=c.o[0]==='p'&&c.i[0]==='p'?25:20;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">${outline(c.o,40,0,LINE+';fill:none')}${outline(c.i,inR,c.ir*15,LINE+';fill:var(--c1)')}</svg>`}
+function halvesSVG(c){
+  const fr={sq:'<rect x="12" y="12" width="76" height="76"/>',ci:'<circle cx="50" cy="50" r="38"/>',oct:`<polygon points="${polyPts(8,41,22.5)}"/>`,dsh:'<path d="M12 12H50A38 38 0 0 1 50 88H12Z"/>'}[c.f];
+  const f=c.a*45*Math.PI/180,dx=22*Math.cos(f),dy=22*Math.sin(f);
+  const half=(x,y,th)=>{const p=a=>{const t=(th+a)*Math.PI/180;return (x+11*Math.cos(t)).toFixed(1)+' '+(y+11*Math.sin(t)).toFixed(1)};
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" style="fill:var(--card)"/><path d="M${p(-90)}A11 11 0 0 1 ${p(90)}Z" style="fill:var(--ink)"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" style="fill:none"/>`};
+  const th=c.a*45;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><g style="${LINE};fill:none">${fr}</g><g style="${LINE}">${half(50+dx,50+dy,th)}${half(50-dx,50-dy,c.flip?th:th+180)}</g></svg>`}
+function numSVG(c){return `<svg viewBox="0 0 100 100" aria-hidden="true">${outline('p'+c.n,40,0,LINE+';fill:none')}<text x="50" y="${c.n===3?62:58}" text-anchor="middle" style="font:800 ${c.n===3?19:22}px var(--body,system-ui);fill:var(--ink)">${c.t}</text></svg>`}
+function drawFig(c){return c.k==='nest'?nestSVG(c):c.k==='halves'?halvesSVG(c):c.k==='num'?numSVG(c):c.k==='sect'?sectSVG(c):c.k==='grid'?gridSVG(c):c.k==='glyph'?glyphSVG(c):figSVG(c)}
 
 // The picture area of a puzzle: the grid with a gap, the row to continue, or (odd one out) the pictures themselves.
 function boardHTML(p,solved){

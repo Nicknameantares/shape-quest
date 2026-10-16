@@ -134,3 +134,9 @@ footer{color:var(--muted);font-size:14px;text-align:center}
   nav .btn{display:none}
 }
 @media (prefers-reduced-motion:reduce){.opt,.mini{transition:none}}
+.ask{margin:0;font-weight:800;font-size:16px;text-wrap:balance}
+.board.row{gap:6px}
+.opts.five{grid-template-columns:repeat(5,1fr);gap:6px}
+.mini .board.row{grid-template-columns:repeat(3,1fr)!important;gap:4px;margin-block:auto}
+.mini-t{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:auto}
+@media (max-width:480px){.opts.five{grid-template-columns:repeat(3,1fr)}}

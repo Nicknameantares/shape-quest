@@ -121,3 +121,10 @@ td.n,th.n{text-align:right}
 .panel h3{font-size:14px;margin:4px 0 0}
 .msg{font-size:13px;font-weight:700;margin:0}.msg.good{color:var(--good)}.msg.bad{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){.opt{transition:none}}
+.board.row{gap:6px}
+.board.row .cell{border-radius:10px}
+.opts.five{grid-template-columns:repeat(5,1fr);gap:8px}
+.opts.five .opt{border-radius:12px}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+.seg.four .sg b{font-size:13px;line-height:1.2;text-align:center}
+@media (max-width:480px){.opts.five{grid-template-columns:repeat(3,1fr);gap:10px}}

@@ -10,7 +10,7 @@ img{max-width:100%}
   --ink:#17203A; --muted:#5A6583; --line:#CBD3E2;
   --accent:#FF6A1F; --accent-ink:#FFFFFF;
   --good:#1E9A55; --good-bg:#E2F5EA; --bad:#D63B32; --bad-bg:#FBE6E4;
-  --c0:#E0453A; --c1:#2C66DD; --c2:#1E9A55; --c3:#E3A000;
+  --c0:#E0453A; --c1:#2C66DD; --c2:#1E9A55; --c3:#E3A000; --wood:#CF9440;
   --display:"Unbounded","Arial Black",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,sans-serif;
 }
@@ -19,13 +19,13 @@ img{max-width:100%}
   --ink:#E9EDF6; --muted:#98A2BC; --line:#2C3448;
   --accent:#FF7D3A; --accent-ink:#1A0E05;
   --good:#3FCB7C; --good-bg:#16301F; --bad:#FF6B61; --bad-bg:#3A1C1A;
-  --c0:#FF6457; --c1:#5C93FF; --c2:#3FCB7C; --c3:#FFC233; color-scheme:dark}}
+  --c0:#FF6457; --c1:#5C93FF; --c2:#3FCB7C; --c3:#FFC233; --wood:#E2B36A; color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#11151F; --card:#1B2130; --tray:#151A26; --grid:rgba(160,180,230,.07);
   --ink:#E9EDF6; --muted:#98A2BC; --line:#2C3448;
   --accent:#FF7D3A; --accent-ink:#1A0E05;
   --good:#3FCB7C; --good-bg:#16301F; --bad:#FF6B61; --bad-bg:#3A1C1A;
-  --c0:#FF6457; --c1:#5C93FF; --c2:#3FCB7C; --c3:#FFC233; color-scheme:dark}
+  --c0:#FF6457; --c1:#5C93FF; --c2:#3FCB7C; --c3:#FFC233; --wood:#E2B36A; color-scheme:dark}
 
 body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -128,3 +128,21 @@ td.n,th.n{text-align:right}
 .seg.four{grid-template-columns:repeat(4,1fr)}
 .seg.four .sg b{font-size:13px;line-height:1.2;text-align:center}
 @media (max-width:480px){.opts.five{grid-template-columns:repeat(3,1fr);gap:10px}}
+
+/* matchstick puzzles */
+.mboard{width:100%;margin:0 auto}
+.mboard svg{width:100%;height:auto;display:block;overflow:visible}
+.mboard .mb{stroke:var(--wood);stroke-width:5.2;stroke-linecap:round}
+.mboard .mh{fill:var(--c0)}
+.mboard .m.held{opacity:.4}
+.mboard .m.held .mb{stroke:var(--accent)}
+.mboard .m.new .mb{stroke:var(--good)}
+.mboard .slot,.mboard .gone{stroke-width:2.6;stroke-dasharray:3 4;stroke-linecap:round}
+.mboard .slot{stroke:var(--muted);opacity:.75}
+.mboard .gone{stroke:var(--bad);opacity:.8}
+.mboard .hit{stroke:transparent;stroke-width:20;stroke-linecap:butt;cursor:pointer;pointer-events:stroke;-webkit-tap-highlight-color:transparent}
+.seg.two{grid-template-columns:repeat(2,1fr)}
+.mtbar{display:flex;flex-direction:column;gap:2px}
+.mcount{font-weight:800;font-size:14px}
+.note.warn,.fb .warn{color:var(--bad);font-weight:700}
+.btn:disabled{opacity:.45;cursor:default}

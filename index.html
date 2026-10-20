@@ -79,16 +79,34 @@
 
 <script src="js/i18n.js"></script>
 <script src="js/puzzles.js"></script>
+<script src="js/matches.js"></script>
 <script>
-let TODAY=dstr(new Date()),sel=TODAY,heroPick=null,mode='mid';
-try{mode=localStorage.getItem('sq-land-mode')||'mid';if(!MODES[mode])mode='mid'}catch(e){}
+let TODAY=dstr(new Date()),sel=TODAY,heroPick=null,heroSt=null,mode='mid',sec='fig';
+try{mode=localStorage.getItem('sq-land-mode')||'mid';if(!MODES[mode])mode='mid';if(localStorage.getItem('sq-land-sec')==='mt')sec='mt'}catch(e){}
+const setOf=d=>sec==='mt'?getMatchSet(d,mode):getSet(d,mode);
 
 function segHTML(){return `<div class="seg" role="group">${MODE_KEYS.map(k=>`<button class="sg${k===mode?' on':''}" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div>`}
+function secHTML(){return `<div class="seg two" role="group">${['fig','mt'].map(k=>`<button class="sg${k===sec?' on':''}" data-sec="${k}"><b>${T('sec.'+k)}</b><small>${T('sec.'+k+'.h')}</small></button>`).join('')}</div>`}
+// Matchsticks: move matches on the board, then check once.
+function renderHeroMatch(){
+  const p=getMatchSet(TODAY,mode)[2],done=heroPick!==null;
+  heroSt=heroSt||mtState(p);
+  const n=mtMoved(p.start,heroSt.cur);
+  document.getElementById('play').innerHTML=`
+   <div class="play-h"><b>${T('l.try')}</b><span class="tag">${T('l.tag',levelName(p.level))}</span></div>
+   ${secHTML()}${segHTML()}
+   <div class="tray">${matchBoard(p,done?{sol:true}:heroSt)}</div>
+   <p class="ask">${mtAsk(p)}</p>
+   ${done?'':`<div class="mtbar"><span class="mcount">${T('mt.moved',n,p.k)}</span><span class="note${heroSt.msg?' warn':''}">${T(heroSt.msg||'mt.how')}</span></div>
+   <div class="cta"><button class="btn sm" data-act="mcheck"${n?'':' disabled'}>${T('mt.check')}</button><button class="btn sm sec" data-act="mreset"${n||heroSt.held!==null?'':' disabled'}>${T('mt.reset')}</button></div>`}
+   <div class="fb ${done?(heroPick?'good':'bad'):''}">${done?(heroPick?T('l.mtOk'):T('l.mtBad',explainP(p).join(' '))):''}</div>`;
+}
 function renderHero(){
+  if(sec==='mt')return renderHeroMatch();
   const p=getSet(TODAY,mode)[2],done=heroPick!==null,ok=done&&heroPick===p.ans,L=LABELS();
   document.getElementById('play').innerHTML=`
    <div class="play-h"><b>${T('l.try')}</b><span class="tag">${T('l.tag',levelName(p.level))}</span></div>
-   ${segHTML()}
+   ${secHTML()}${segHTML()}
    ${p.type==='odd'?'':`<div class="tray"><div style="width:100%;max-width:${p.type==='matrix'?300:520}px">${boardHTML(p,ok)}</div></div>`}
    <p class="ask">${T(p.type==='matrix'?'ask':'ask.'+p.type)}</p>
    <div class="opts${p.type==='odd'?' five':''}">${p.options.map((o,i)=>{let c='';if(done){c=i===p.ans?' good':i===heroPick?' bad':' dim'}
@@ -103,12 +121,12 @@ function renderDays(){
   document.getElementById('days').innerHTML=out.join('');
 }
 function renderGrid(){
-  const set=getSet(sel,mode),isToday=sel===TODAY;
+  const set=setOf(sel),isToday=sel===TODAY;
   const dt=new Date(sel+'T12:00:00').toLocaleDateString(LOCALE(),{day:'numeric',month:'long'});
-  document.getElementById('set-title').textContent=T(isToday?'l.setToday':'l.setPast',dt)+' · '+T('mode.'+mode).toLowerCase();
+  document.getElementById('set-title').textContent=T(isToday?'l.setToday':'l.setPast',dt)+' · '+T('sec.'+sec).toLowerCase()+' · '+T('mode.'+mode).toLowerCase();
   document.getElementById('grid').innerHTML=set.map((p,ix)=>`<a class="mini" href="play.html" aria-label="${T('dotAria',ix+1)}">
       ${boardHTML(p,!isToday)}
-      <div class="mini-t">${T('type.'+p.type[0])}</div>
+      <div class="mini-t">${T(typeKey(p))}</div>
       <div class="mini-f"><span>№${ix+1}</span>${ix===9?`<span class="badge">${T('l.final')}</span>`:`<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span>`}</div></a>`).join('');
 }
 function renderStatic(){
@@ -117,20 +135,27 @@ function renderStatic(){
   document.getElementById('lang').textContent=T('lang');
   document.getElementById('today-label').textContent=T('l.todayFor',new Date().toLocaleDateString(LOCALE(),{day:'numeric',month:'long',weekday:'long'}));
 }
-function init(){renderStatic();renderHero();renderDays();renderGrid();document.getElementById('seg2').innerHTML=segHTML()}
+const renderSeg2=()=>{document.getElementById('seg2').innerHTML=secHTML()+segHTML()};
+function init(){renderStatic();renderHero();renderDays();renderGrid();renderSeg2()}
 
 document.addEventListener('click',e=>{
   const b=e.target.closest('.sg');if(!b)return;
-  mode=b.dataset.k;try{localStorage.setItem('sq-land-mode',mode)}catch(_){}
-  heroPick=null;renderHero();renderGrid();document.getElementById('seg2').innerHTML=segHTML();
+  if(b.dataset.sec){sec=b.dataset.sec;try{localStorage.setItem('sq-land-sec',sec)}catch(_){}}
+  else{mode=b.dataset.k;try{localStorage.setItem('sq-land-mode',mode)}catch(_){}}
+  heroPick=null;heroSt=null;renderHero();renderGrid();renderSeg2();
 });
-document.getElementById('play').addEventListener('click',e=>{const b=e.target.closest('.opt');if(!b||heroPick!==null)return;heroPick=+b.dataset.i;renderHero()});
+document.getElementById('play').addEventListener('click',e=>{
+  if(heroPick!==null)return;
+  if(sec==='mt'){const b=e.target.closest('[data-act]');if(!b)return;const p=getMatchSet(TODAY,mode)[2];
+    if(b.dataset.act==='slot')mtTap(p,heroSt,+b.dataset.s);else if(b.dataset.act==='mreset')heroSt=null;else if(b.dataset.act==='mcheck')heroPick=mtCheck(p,heroSt.cur);
+    renderHero();return}
+  const b=e.target.closest('.opt');if(!b)return;heroPick=+b.dataset.i;renderHero()});
 document.getElementById('days').addEventListener('click',e=>{const b=e.target.closest('.day');if(!b)return;sel=b.dataset.d;renderDays();renderGrid()});
 document.getElementById('lang').addEventListener('click',()=>{setLang(LANG==='ru'?'en':'ru');init()});
 
 function tick(){
   const now=new Date();
-  if(dstr(now)!==TODAY){TODAY=dstr(now);sel=TODAY;heroPick=null;init()}
+  if(dstr(now)!==TODAY){TODAY=dstr(now);sel=TODAY;heroPick=null;heroSt=null;init()}
   const mid=new Date(now);mid.setHours(24,0,0,0);
   const s=Math.max(0,Math.floor((mid-now)/1000)),p=v=>String(v).padStart(2,'0');
   document.getElementById('hh').textContent=p(Math.floor(s/3600));

@@ -14,6 +14,7 @@
 <div class="wrap" id="app"></div>
 <script src="js/i18n.js"></script>
 <script src="js/puzzles.js"></script>
+<script src="js/matches.js"></script>
 <script>
 /* ---------- storage ---------- */
 const LS='shape-quest.v1';
@@ -37,15 +38,17 @@ const encodeCode=()=>'NF1:'+btoa(unescape(encodeURIComponent(JSON.stringify({pla
 function decodeCode(t){t=(t||'').trim().replace(/\s+/g,'');if(!t.startsWith('NF1:'))throw 0;return JSON.parse(decodeURIComponent(escape(atob(t.slice(4)))))}
 
 const TODAY=dstr(new Date());
-const ui={mode:'day',ptype:'mix',idx:null,practiceSeed:null,practice:[],hint:{},panel:false,arm:null,xfer:false,xmsg:null};
+const ui={sec:store.sec==='mt'?'mt':'fig',mode:'day',ptype:'mix',idx:null,practiceSeed:null,practice:[],hint:{},mst:{},panel:false,arm:null,xfer:false,xmsg:null};
 const player=()=>store.players.find(p=>p.id===store.cur)||store.players[0];
 const pmode=pid=>{const p=store.players.find(x=>x.id===pid);return(p&&p.m)||'mid'};
-function dayRes(pid,d=TODAY){return((store.results[pid]||{})[rk(d,pmode(pid))])||[]}
+// Results of the two sections are kept under different keys: figures by rk(), matchsticks by mtKey().
+const resKey=(d,m)=>ui.sec==='mt'?mtKey(d,m):rk(d,m);
+function dayRes(pid,d=TODAY){return((store.results[pid]||{})[resKey(d,pmode(pid))])||[]}
 function answers(){return ui.mode==='day'?dayRes(player().id):ui.practice}
-function curSet(){const m=pmode(player().id);return ui.mode==='day'?getSet(TODAY,m):getSet(ui.practiceSeed,m,ui.ptype)}
+function curSet(){const m=pmode(player().id),get=ui.sec==='mt'?getMatchSet:getSet;return ui.mode==='day'?get(TODAY,m):get(ui.practiceSeed,m,ui.ptype)}
 function firstOpen(){const a=answers();for(let i=0;i<10;i++)if(!a[i])return i;return 10}
 function streak(pid){
-  const r=store.results[pid]||{};const done=d=>MODE_KEYS.some(m=>(r[rk(d,m)]||[]).filter(Boolean).length===10);
+  const r=store.results[pid]||{};const full=k=>(r[k]||[]).filter(Boolean).length===10,done=d=>MODE_KEYS.some(m=>full(rk(d,m))||full(mtKey(d,m)));
   const d=new Date();let n=0;if(!done(dstr(d)))d.setDate(d.getDate()-1);
   while(done(dstr(d))){n++;d.setDate(d.getDate()-1)}return n;
 }
@@ -68,18 +71,23 @@ function render(){
   h+=`<div class="acct"><span class="st">${T('acct.local')}</span><button class="link" data-act="xfer">${ui.xfer?T('hide'):T('xfer')}</button></div>`;
   if(ui.xfer)h+=xferHTML();
   if(ui.panel)h+=panelHTML();
+  h+=`<div class="diff"><span class="dl">${T('sec')}</span><div class="seg two">${['fig','mt'].map(k=>`<button class="sg${k===ui.sec?' on':''}" data-act="sec" data-k="${k}"><b>${T('sec.'+k)}</b><small>${T('sec.'+k+'.h')}</small></button>`).join('')}</div></div>`;
   h+=`<div class="tabs"><button class="tab${ui.mode==='day'?' on':''}" data-act="mode" data-m="day">${T('tab.day')}</button><button class="tab${ui.mode==='practice'?' on':''}" data-act="mode" data-m="practice">${T('tab.practice')}</button></div>`;
   const pm=pmode(player().id);
   h+=`<div class="diff"><span class="dl">${T('diffFor',esc(player().name))}</span><div class="seg">${MODE_KEYS.map(k=>`<button class="sg${k===pm?' on':''}" data-act="diff" data-k="${k}"><b>${T('mode.'+k)}</b><small>${T('mode.'+k+'.h')}</small></button>`).join('')}</div></div>`;
-  if(ui.mode==='practice')h+=`<div class="diff"><span class="dl">${T('ptype')}</span><div class="seg four">${TYPES.map(k=>`<button class="sg${k===ui.ptype?' on':''}" data-act="ptype" data-k="${k}"><b>${T('type.'+k)}</b></button>`).join('')}</div></div>`;
+  const types=ui.sec==='mt'?MT_TYPES:TYPES;
+  if(ui.mode==='practice')h+=`<div class="diff"><span class="dl">${T('ptype')}</span><div class="seg${types.length===4?' four':''}">${types.map(k=>`<button class="sg${k===ui.ptype?' on':''}" data-act="ptype" data-k="${k}"><b>${T('type.'+k)}</b></button>`).join('')}</div></div>`;
   h+=`<div class="dots">${set.map((_,i)=>{const x=a[i];return `<button class="dot${x?(x.ok?' ok':' no'):''}${i===ui.idx?' cur':''}" data-act="go" data-i="${i}" aria-label="${T('dotAria',i+1)}">${i+1}</button>`}).join('')}</div>`;
   h+=ui.idx>=10?summaryHTML(a):puzzleHTML(set[ui.idx],a[ui.idx]);
   app.innerHTML=h;
 }
+const metaHTML=p=>`<div class="meta"><b>${T('task',ui.idx+1)} · ${T(typeKey(p))}</b><div class="lvl">${levelName(p.level)}<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span></div></div>`;
+const nextHTML=()=>`<div class="actions"><button class="btn" data-act="next">${firstOpen()>=10?T('results'):T('next')} →</button></div>`;
 function puzzleHTML(p,res){
+  if(p.type==='match')return matchHTML(p,res);
   const done=!!res,L=LABELS();
   const boardW=p.type==='matrix'?(p.n===2?240:360):p.type==='odd'?0:560;
-  let h=`<div class="meta"><b>${T('task',ui.idx+1)} · ${T('type.'+p.type[0])}</b><div class="lvl">${levelName(p.level)}<span class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<p.level?'f':''}"></i>`).join('')}</span></div></div>`;
+  let h=metaHTML(p);
   if(boardW)h+=`<div class="tray"><div style="width:100%;max-width:${boardW}px">${boardHTML(p,done&&res.ok)}</div></div>`;
   h+=`<p class="ask">${T(p.type==='matrix'?'ask':'ask.'+p.type)}</p>`;
   h+=`<div class="opts${p.type==='odd'?' five':''}">${p.options.map((o,i)=>{
@@ -90,12 +98,31 @@ function puzzleHTML(p,res){
     const praise=T('praise')[p.level%4];
     h+=res.ok?`<div class="fb good"><strong>${praise}</strong>${why}</div>`
              :`<div class="fb bad"><strong>${T('wrong',L[p.ans])}</strong>${why}</div>`;
-    h+=`<div class="actions"><button class="btn" data-act="next">${firstOpen()>=10?T('results'):T('next')} →</button></div>`;
+    h+=nextHTML();
   }else if(ui.hint[ui.mode+ui.idx]){
     h+=`<div class="fb"><strong>${T('hint')}</strong>${why}</div>`;
   }else{
     h+=`<div class="actions"><button class="btn sec" data-act="hint">${T('hint')}</button></div>`;
   }
+  return h;
+}
+// Matchsticks: the board is played in place, then checked once, like picking an option.
+const mkey=()=>[ui.sec,ui.mode,pmode(player().id),ui.practiceSeed,ui.idx].join('|');
+const mstate=p=>ui.mst[mkey()]=ui.mst[mkey()]||mtState(p);
+function matchHTML(p,res){
+  let h=metaHTML(p);
+  if(res){
+    const why=`<ul>${explainP(p).map(w=>`<li>${w}</li>`).join('')}</ul>`;
+    h+=`<div class="tray">${matchBoard(p,{sol:true})}</div><p class="ask">${mtAsk(p)}</p>`;
+    h+=res.ok?`<div class="fb good"><strong>${T('praise')[p.level%4]}</strong>${why}</div>`
+             :`<div class="fb bad"><strong>${T(res.c<0?'mt.gaveUp':'mt.wrong')}</strong>${why}</div>`;
+    return h+nextHTML();
+  }
+  const st=mstate(p),n=mtMoved(p.start,st.cur),hint=ui.hint[ui.mode+ui.idx];
+  h+=`<div class="tray">${matchBoard(p,st)}</div><p class="ask">${mtAsk(p)}</p>`;
+  h+=`<div class="mtbar"><span class="mcount">${T('mt.moved',n,p.k)}</span><span class="note${st.msg?' warn':''}">${T(st.msg||'mt.how')}</span></div>`;
+  if(hint)h+=`<div class="fb"><strong>${T('hint')}</strong><ul>${mtHint(p).map(w=>`<li>${w}</li>`).join('')}</ul></div>`;
+  h+=`<div class="actions"><button class="btn" data-act="mcheck"${n?'':' disabled'}>${T('mt.check')}</button><button class="btn sec" data-act="mreset"${n||st.held!==null?'':' disabled'}>${T('mt.reset')}</button>${hint?'':`<button class="btn sec" data-act="hint">${T('hint')}</button>`}<button class="link" data-act="mgive">${T('mt.give')}</button></div>`;
   return h;
 }
 function summaryHTML(a){
@@ -148,12 +175,18 @@ app.addEventListener('click',e=>{
   else if(act==='ptype'){if(ui.ptype!==b.dataset.k){ui.ptype=b.dataset.k;startPractice();ui.idx=null}}
   else if(act==='go')ui.idx=+b.dataset.i;
   else if(act==='hint')ui.hint[ui.mode+ui.idx]=true;
+  else if(act==='sec'){if(ui.sec!==b.dataset.k){ui.sec=store.sec=b.dataset.k;save();ui.ptype='mix';ui.hint={};ui.idx=null;if(ui.mode==='practice')startPractice()}}
   else if(act==='ans'){
-    const a=answers();if(a[ui.idx])return;
+    if(answers()[ui.idx])return;
     const p=curSet()[ui.idx],i=+b.dataset.i;
-    const rec={c:i,ok:i===p.ans,h:!!ui.hint[ui.mode+ui.idx]};
-    if(ui.mode==='day'){const pid=player().id;store.results[pid]=store.results[pid]||{};const r=store.results[pid][rk(TODAY,pmode(pid))]=dayRes(pid).slice();r[ui.idx]=rec;save()}
-    else ui.practice[ui.idx]=rec;
+    record({c:i,ok:i===p.ans});
+  }
+  else if(act==='slot'||act==='mreset'||act==='mcheck'||act==='mgive'){
+    if(answers()[ui.idx])return;
+    const p=curSet()[ui.idx],st=mstate(p);
+    if(act==='slot')mtTap(p,st,+b.dataset.s);
+    else if(act==='mreset')ui.mst[mkey()]=mtState(p);
+    else record({c:act==='mgive'?-1:0,ok:act==='mcheck'&&mtCheck(p,st.cur)});
   }
   else if(act==='next'){const a=answers();let n=10;for(let k=1;k<=10;k++){const j=(ui.idx+k)%10;if(!a[j]){n=j;break}}ui.idx=n}
   else if(act==='newpractice'){startPractice();ui.mode='practice';ui.idx=0}
@@ -166,6 +199,11 @@ app.addEventListener('click',e=>{
 });
 app.addEventListener('input',e=>{const t=e.target;if(t.matches('.prow input')){const p=store.players.find(x=>x.id===t.dataset.id);if(p){p.name=t.value||'?';save()}}});
 app.addEventListener('change',e=>{if(e.target.matches('.prow input'))render()});
+function record(rec){
+  rec.h=!!ui.hint[ui.mode+ui.idx];
+  if(ui.mode==='day'){const pid=player().id;store.results[pid]=store.results[pid]||{};const r=store.results[pid][resKey(TODAY,pmode(pid))]=dayRes(pid).slice();r[ui.idx]=rec;save()}
+  else ui.practice[ui.idx]=rec;
+}
 function startPractice(){ui.practiceSeed='pr'+Date.now()+Math.random();ui.practice=[];ui.hint={}}
 render();
 </script>

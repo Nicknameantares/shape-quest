@@ -320,6 +320,7 @@ function drawFig(c){return c.k==='nest'?nestSVG(c):c.k==='halves'?halvesSVG(c):c
 
 // The picture area of a puzzle: the grid with a gap, the row to continue, or (odd one out) the pictures themselves.
 function boardHTML(p,solved){
+  if(p.type==='match')return matchBoard(p,solved?{sol:true}:null);
   const q=c=>solved?`<div class="cell q solved">${drawFig(c)}</div>`:`<div class="cell q">?</div>`;
   if(p.type==='odd')return `<div class="board row" style="grid-template-columns:repeat(5,1fr)">${p.options.map((c,i)=>`<div class="cell${solved&&i===p.ans?' q solved':''}">${drawFig(c)}</div>`).join('')}</div>`;
   if(p.type==='seq')return `<div class="board row" style="grid-template-columns:repeat(${p.frames.length+1},1fr)">${p.frames.map(c=>`<div class="cell">${drawFig(c)}</div>`).join('')}${q(p.options[p.ans])}</div>`;
@@ -337,5 +338,7 @@ function getSet(seed,mode,type='mix'){const k=seed+'|'+mode+'|'+type;
   if(!cache[k])cache[k]=MODES[mode].lv.map((t,i)=>{if(type!=='mix')t=type+t.slice(1);return buildPuzzle(t,rngFrom(rk(seed,mode)+'#'+i+(t[0]==='m'?'':t[0])))});
   return cache[k]}
 
+// i18n key for the kind of a puzzle, as shown above it.
+const typeKey=p=>'type.'+(p.type==='match'?p.kind:p.type[0]);
 const levelName=l=>T(l<=3?'lv.easy':l<=6?'lv.mid':l<=8?'lv.hard':'lv.vhard');
 const dstr=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');

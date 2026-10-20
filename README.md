@@ -6,6 +6,7 @@ A daily logic trainer for kids and adults: find the missing figure, spot the odd
   - **Missing figure**: a 2×2 or 3×3 grid with a gap.
   - **Odd one out**: five pictures, four share a rule (shape, color, opposite sectors, round inside straight, cell count, inner polygon with one side fewer, symmetry, half-black circles facing outward, turned vs. mirrored, numbers built from the side count).
   - **What comes next**: a row that repeats, fills, turns or moves, up to turns that grow and mirror-image traps.
+- A second section, **Matchsticks**: move one or two matches so an equation becomes true or a new number appears (a given number, the largest or the smallest). Same daily set of 10, same three difficulty levels; tap a match to pick it up, tap an empty place to put it down.
 - Practice mode can drill one kind at a time.
 - Three difficulty levels: easy (for kids), normal (levels 1–10), hard (for adults).
 - Several players on one device, each with their own score, streak and difficulty.
